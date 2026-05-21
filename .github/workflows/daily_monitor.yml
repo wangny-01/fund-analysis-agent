@@ -1,0 +1,58 @@
+name: Daily Redemption Monitor
+
+on:
+  schedule:
+    # Tuesday through Friday at 9:00 AM Beijing (1:00 AM UTC)
+    - cron: '0 1 * * 2-5'
+    # Monday through Friday at 2:30 PM Beijing (6:30 AM UTC) - afternoon check
+    - cron: '30 6 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily monitor
+        env:
+          DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
+        run: python -m src.main --mode daily
+
+      - name: Commit state changes
+        if: always()
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update portfolio alerts [skip ci]"
+          file_pattern: "data/portfolio_state.json"
+          commit_user_name: "fund-analysis-bot"
+          commit_user_email: "bot@fund-analysis.local"
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
+        run: |
+          python -c "
+          import requests, json, os
+          url = os.environ.get('DINGTALK_WEBHOOK_URL', '')
+          if url:
+              msg = {'msgtype': 'text', 'text': {'content': '⚠️ 基金赎回监控执行失败，请检查 GitHub Actions 日志'}}
+              requests.post(url, json=msg)
+          "

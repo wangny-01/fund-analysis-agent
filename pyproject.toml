@@ -1,0 +1,25 @@
+[project]
+name = "fund-analysis-agent"
+version = "1.0.0"
+description = "Automated Chinese A-share fund analysis and recommendation system"
+requires-python = ">=3.10"
+dependencies = [
+    "akshare>=1.16.0",
+    "requests>=2.31.0",
+    "pyyaml>=6.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scipy>=1.10.0",
+    "python-dateutil>=2.8.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project.scripts]
+fund-analysis = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "config*"]
