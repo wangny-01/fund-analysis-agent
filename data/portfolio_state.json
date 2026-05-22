@@ -1,6 +1,44 @@
 {
   "version": 1,
-  "last_updated": "2026-05-22T12:31:27.165642",
-  "holdings": [],
+  "last_updated": "2026-05-22T12:40:00",
+  "holdings": [
+    {
+      "fund_code": "014132",
+      "fund_name": "华泰柏瑞聚优智选一年持有期混合C",
+      "sector": "科技",
+      "purchase_date": "2026-05-21",
+      "purchase_nav": 0.5746,
+      "purchase_score": 0,
+      "recommended_hold_days": 7,
+      "target_exit_date": "2026-05-28",
+      "status": "holding",
+      "alerts_sent": [],
+      "note": "⚠️ 一年持有期锁定，实际需持有至2027-05-21"
+    },
+    {
+      "fund_code": "021874",
+      "fund_name": "中欧中证沪深港黄金产业股票指数C",
+      "sector": "有色金属",
+      "purchase_date": "2026-04-21",
+      "purchase_nav": 1.8771,
+      "purchase_score": 0,
+      "recommended_hold_days": 9,
+      "target_exit_date": "2026-04-30",
+      "status": "holding",
+      "alerts_sent": []
+    },
+    {
+      "fund_code": "026200",
+      "fund_name": "大摩港股通多元成长混合C",
+      "sector": "消费",
+      "purchase_date": "2026-01-13",
+      "purchase_nav": 1.0000,
+      "purchase_score": 0,
+      "recommended_hold_days": 9,
+      "target_exit_date": "2026-01-22",
+      "status": "holding",
+      "alerts_sent": []
+    }
+  ],
   "history": []
 }

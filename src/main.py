@@ -172,8 +172,6 @@ def run_weekly():
             continue
 
         nav_data = fetch_fund_nav(code, name)
-        sector = h.get("sector", "")
-        market_data = market_snapshot.sectors.get(sector)
 
         signals = check_redemption_signals(
             fund_code=code,
@@ -181,7 +179,7 @@ def run_weekly():
             purchase_nav=purchase_nav,
             holding_days=holding_days,
             nav_data=nav_data,
-            market_data=market_data,
+            market_data=None,
             previous_rank_pct=None,
             current_rank_pct=None,
             sector_negative_news=False,
@@ -216,9 +214,7 @@ def run_daily():
         logger.info("No held funds, nothing to monitor.")
         return
 
-    sector_boards = load_sector_mapping()
-    market_snapshot = fetch_market_data(sector_boards)
-
+    # Daily mode: skip heavy market data fetch, only check NAV + signals
     for h in holdings:
         code = h["fund_code"]
         name = h.get("fund_name", code)
