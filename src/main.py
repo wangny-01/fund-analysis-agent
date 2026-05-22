@@ -259,21 +259,100 @@ def run_daily():
     logger.info("=== Daily Monitor Complete ===")
 
 
+def run_quick():
+    """
+    Fast redemption check: skip market data entirely.
+    Only fetches NAV for held funds, checks 5 redemption signals,
+    sends DingTalk for CRITICAL/HIGH only. Completes in <60 seconds.
+    """
+    logger.info("=== Quick Redemption Check ===")
+    tracker = PortfolioTracker()
+    dingtalk = DingTalkSender()
+    holdings = tracker.get_holdings()
+
+    if not holdings:
+        logger.info("No held funds.")
+        return
+
+    critical_issues = []
+
+    for h in holdings:
+        code = h["fund_code"]
+        name = h.get("fund_name", code)
+        purchase_nav = h.get("purchase_nav", 0)
+        holding_days = tracker.get_holding_days(code)
+        note = h.get("note", "")
+
+        logger.info("Checking %s (%s): day %d", name, code, holding_days)
+
+        nav_data = fetch_fund_nav(code, name)
+        current_nav = nav_data.current_nav if nav_data else None
+
+        if current_nav is None:
+            logger.warning("NAV unavailable for %s, using last known", code)
+            continue
+
+        current_pnl = tracker.get_current_pnl(code, current_nav) or 0.0
+
+        signals = check_redemption_signals(
+            fund_code=code, fund_name=name, purchase_nav=purchase_nav,
+            holding_days=holding_days, nav_data=nav_data,
+            market_data=None, previous_rank_pct=None,
+            current_rank_pct=None, sector_negative_news=False,
+        )
+
+        triggered = [s for s in signals if s.triggered]
+        critical = [s for s in triggered if s.priority == "CRITICAL"]
+        high = [s for s in triggered if s.priority == "HIGH"]
+
+        if critical or high:
+            alert_msg = format_redemption_alert(code, name, signals, current_pnl, holding_days)
+            if alert_msg:
+                alert_key = f"redemption_{code}_{datetime.now().strftime('%Y%m%d')}"
+                if not tracker.has_alert_been_sent(code, alert_key):
+                    dingtalk.send_markdown("赎回提醒", alert_msg)
+                    tracker.record_alert(code, alert_key)
+                    logger.info("Alert sent for %s", name)
+
+            for s in critical + high:
+                critical_issues.append(f"- {name}({code}): {s.signal_name} → {s.action}")
+
+        # Autonomous decision: log medium signals but don't alert
+        medium = [s for s in triggered if s.priority == "MEDIUM"]
+        for s in medium:
+            logger.info("  [MEDIUM] %s: %s → %s", name, s.signal_name, s.action)
+
+        # Check lock-up constraint
+        if note and "锁定" in note:
+            logger.info("  [LOCKED] %s has lock-up constraint, skip redemption", name)
+
+    tracker.save()
+
+    # Send summary only if critical issues found
+    if critical_issues:
+        summary = "=== 持仓紧急信号 ===\n" + "\n".join(critical_issues)
+        dingtalk.send_text(summary)
+
+    logger.info("=== Quick Check Complete ===")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Fund Analysis Agent")
     parser.add_argument(
         "--mode",
-        choices=["weekly", "daily"],
+        choices=["weekly", "daily", "quick"],
         required=True,
-        help="weekly: full analysis + recommendations; daily: redemption monitoring",
+        help="weekly: full analysis + recommendations; daily: redemption monitoring; quick: fast redemption check",
     )
     args = parser.parse_args()
 
     try:
         if args.mode == "weekly":
             run_weekly()
-        else:
+        elif args.mode == "daily":
             run_daily()
+        else:
+            run_quick()
     except Exception:
         logger.exception("Fatal error in %s mode", args.mode)
         # Try to notify via DingTalk

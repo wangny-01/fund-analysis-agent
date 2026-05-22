@@ -2,11 +2,19 @@ name: Daily Redemption Monitor
 
 on:
   schedule:
-    # Tuesday through Friday at 9:00 AM Beijing (1:00 AM UTC)
     - cron: '0 1 * * 2-5'
-    # Monday through Friday at 2:30 PM Beijing (6:30 AM UTC) - afternoon check
     - cron: '30 6 * * 1-5'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Monitor mode'
+        required: true
+        type: choice
+        default: 'quick'
+        options:
+          - 'quick'
+          - 'daily'
+          - 'weekly'
 
 jobs:
   monitor:
@@ -30,17 +38,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run daily monitor
+      - name: Run ${{ inputs.mode }} monitor
         env:
           DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
-        run: python -m src.main --mode daily
+        run: python -m src.main --mode ${{ inputs.mode }}
 
       - name: Commit state changes
         if: always()
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: update portfolio alerts [skip ci]"
+          commit_message: "chore: update portfolio [skip ci]"
           file_pattern: "data/portfolio_state.json"
           commit_user_name: "fund-analysis-bot"
           commit_user_email: "bot@fund-analysis.local"
@@ -52,9 +60,8 @@ jobs:
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: |
           python -c "
-          import requests, json, os
+          import requests, os
           url = os.environ.get('DINGTALK_WEBHOOK_URL', '')
           if url:
-              msg = {'msgtype': 'text', 'text': {'content': '⚠️ 基金赎回监控执行失败，请检查 GitHub Actions 日志'}}
-              requests.post(url, json=msg)
+              requests.post(url, json={'msgtype':'text','text':{'content':'Redemption monitor failed, check GitHub Actions.'}}, timeout=10)
           "

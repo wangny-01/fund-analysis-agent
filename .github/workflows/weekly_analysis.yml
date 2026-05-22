@@ -1,10 +1,19 @@
-name: Weekly Fund Analysis
+name: Fund Analysis
 
 on:
   schedule:
-    # Every Monday at 1:00 AM UTC = 9:00 AM Beijing (UTC+8)
     - cron: '0 1 * * 1'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Analysis mode'
+        required: true
+        type: choice
+        default: 'weekly'
+        options:
+          - 'weekly'
+          - 'daily'
+          - 'quick'
 
 jobs:
   analyze:
@@ -28,17 +37,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run weekly analysis
+      - name: Run ${{ inputs.mode }} analysis
         env:
           DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
-        run: python -m src.main --mode weekly
+        run: python -m src.main --mode ${{ inputs.mode }}
 
-      - name: Commit portfolio state and reports
+      - name: Commit state and reports
         if: always()
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: update portfolio state and reports [skip ci]"
+          commit_message: "chore: update data [skip ci]"
           file_pattern: "data/ output/"
           commit_user_name: "fund-analysis-bot"
           commit_user_email: "bot@fund-analysis.local"
@@ -50,9 +59,8 @@ jobs:
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: |
           python -c "
-          import requests, json, os
+          import requests, os
           url = os.environ.get('DINGTALK_WEBHOOK_URL', '')
           if url:
-              msg = {'msgtype': 'text', 'text': {'content': '⚠️ 周一基金分析任务执行失败，请检查 GitHub Actions 日志'}}
-              requests.post(url, json=msg)
+              requests.post(url, json={'msgtype':'text','text':{'content':'Fund analysis failed, check GitHub Actions.'}}, timeout=10)
           "
