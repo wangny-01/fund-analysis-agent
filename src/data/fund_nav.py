@@ -37,6 +37,7 @@ def fetch_fund_nav(fund_code: str, fund_name: str = "") -> FundNAVData:
             ak.fund_open_fund_info_em,
             symbol=fund_code,
             indicator="单位净值走势",
+            period="日",
             cache_ttl_seconds=600,
         )
 
@@ -112,6 +113,7 @@ def fetch_current_nav(fund_code: str) -> Optional[float]:
             ak.fund_open_fund_info_em,
             symbol=fund_code,
             indicator="单位净值走势",
+            period="日",
             cache_ttl_seconds=300,
         )
         if df is None or df.empty:

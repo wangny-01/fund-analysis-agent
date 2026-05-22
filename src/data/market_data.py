@@ -174,16 +174,18 @@ def fetch_market_data(sector_boards: dict[str, list[str]]) -> MarketSnapshot:
     # North-bound capital flow
     try:
         north = safe_fetch(
-            ak.stock_hsgt_north_net_flow_in_em,
-            indicator="沪股通",
+            ak.stock_hsgt_hist_em,
+            symbol="沪股通",
             cache_ttl_seconds=1800,
         )
 
         if north is not None and not north.empty:
             north.columns = [str(c) for c in north.columns]
-            net_col = None
+            date_col = net_col = None
             for c in north.columns:
-                if "净流入" in c or "净买卖" in c:
+                if "日期" in c:
+                    date_col = c
+                if "净流入" in c or "净买卖" in c or "成交净买" in c:
                     net_col = c
             if net_col:
                 flows = pd.to_numeric(north[net_col], errors="coerce").dropna()

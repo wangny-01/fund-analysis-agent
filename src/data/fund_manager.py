@@ -30,72 +30,54 @@ def fetch_fund_manager(fund_code: str, fund_name: str = "") -> FundManagerData:
     result = FundManagerData(fund_code=fund_code, fund_name=fund_name)
 
     try:
-        # Try akshare fund_manager_em first
-        df = safe_fetch(
-            ak.fund_manager_em,
-            symbol=fund_code,
-            cache_ttl_seconds=7200,
-        )
+        # fund_manager_em() takes no params, returns all managers; filter by fund code
+        df = safe_fetch(ak.fund_manager_em, cache_ttl_seconds=7200)
 
         if df is not None and not df.empty:
             df.columns = [str(c) for c in df.columns]
 
-            name_col = tenure_col = fund_count_col = None
+            # Find columns
+            code_col = name_col = tenure_col = fund_count_col = return_col = None
             for c in df.columns:
+                cl = c.lower()
+                if "代码" in c or "code" in cl:
+                    code_col = c
                 if "姓名" in c:
                     name_col = c
                 if "任职" in c or "年限" in c:
                     tenure_col = c
                 if "基金" in c and ("管理" in c or "数量" in c or "只数" in c):
                     fund_count_col = c
+                if "回报" in c or "收益" in c or "业绩" in c:
+                    return_col = c
+
+            # Try to find the row for this fund
+            if code_col:
+                mask = df[code_col].astype(str).str.strip() == fund_code.strip()
+                if mask.any():
+                    row = df[mask].iloc[0]
+                else:
+                    row = df.iloc[0]
+            else:
+                row = df.iloc[0]
 
             if name_col:
-                result.manager_name = str(df.iloc[0][name_col]) if pd.notna(df.iloc[0][name_col]) else ""
-
+                result.manager_name = str(row[name_col]) if pd.notna(row[name_col]) else ""
             if tenure_col:
-                raw = str(df.iloc[0][tenure_col]) if pd.notna(df.iloc[0][tenure_col]) else "0"
+                raw = str(row[tenure_col]) if pd.notna(row[tenure_col]) else "0"
                 try:
-                    result.tenure_years = float(raw.replace("年", "").replace("年", "").strip())
+                    result.tenure_years = float(raw.replace("年", "").strip())
                 except ValueError:
                     result.tenure_years = 0.0
-
             if fund_count_col:
-                val = pd.to_numeric(df.iloc[0][fund_count_col], errors="coerce")
+                val = pd.to_numeric(row[fund_count_col], errors="coerce")
                 result.funds_managed_count = int(val) if pd.notna(val) else 0
+            if return_col:
+                val = pd.to_numeric(row[return_col], errors="coerce")
+                if pd.notna(val):
+                    result.historical_annual_return = float(val)
         else:
-            # Fallback: use fund_open_fund_info_em to get basic fund info
-            info_df = safe_fetch(
-                ak.fund_open_fund_info_em,
-                symbol=fund_code,
-                indicator="基金档案",
-                cache_ttl_seconds=7200,
-            )
-
-            if info_df is not None and not info_df.empty:
-                info_df.columns = [str(c) for c in info_df.columns]
-                for _, row in info_df.iterrows():
-                    for c in info_df.columns:
-                        val = str(row[c]) if pd.notna(row[c]) else ""
-                        if "基金经理" in c or "经理" in c:
-                            if not result.manager_name and val:
-                                result.manager_name = val
-                        if "管理费" in c:
-                            try:
-                                result.management_fee = float(val.replace("%", ""))
-                            except ValueError:
-                                pass
-            else:
-                result.manager_name = "未知"
-
-        # Check fund base info for manager
-        base_df = safe_fetch(
-            ak.fund_individual_basic_info_xq,
-            symbol=fund_code,
-            cache_ttl_seconds=7200,
-        )
-
-        if base_df is not None and not base_df.empty:
-            base_df.columns = [str(c) for c in base_df.columns]
+            result.manager_name = "未知"
 
     except Exception as e:
         logger.error("fetch_fund_manager(%s): %s", fund_code, e)
@@ -120,17 +102,17 @@ def fetch_fund_ranking(fund_code: str) -> Optional[float]:
 
         code_col = rank_col = total_col = None
         for c in df.columns:
+            cl = c.lower()
             if "代码" in c:
                 code_col = c
             if "排名" in c:
                 rank_col = c
-            if "总数" in c:
+            if "总数" in c or "total" in cl:
                 total_col = c
 
         if code_col is None or rank_col is None:
             return None
 
-        # Try to find the fund code
         row = df[df[code_col].astype(str).str.strip() == fund_code.strip()]
         if row.empty:
             return None
