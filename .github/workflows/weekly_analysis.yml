@@ -31,6 +31,7 @@ jobs:
       - name: Run weekly analysis
         env:
           DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: python -m src.main --mode weekly
 
       - name: Commit portfolio state and reports
@@ -46,6 +47,7 @@ jobs:
         if: failure()
         env:
           DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: |
           python -c "
           import requests, json, os

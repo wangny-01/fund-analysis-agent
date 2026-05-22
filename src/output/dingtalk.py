@@ -1,26 +1,54 @@
-import json
+import base64
+import hashlib
+import hmac
 import logging
 import time
+import urllib.parse
 from datetime import datetime
 from typing import Optional
 
 import requests
 
-from config.settings import DINGTALK_WEBHOOK_URL, DINGTALK_MAX_MSG_CHARS, DINGTALK_MSG_DELAY
+from config.settings import (
+    DINGTALK_WEBHOOK_URL,
+    DINGTALK_SECRET,
+    DINGTALK_MAX_MSG_CHARS,
+    DINGTALK_MSG_DELAY,
+)
 
 logger = logging.getLogger(__name__)
 
 
+def _build_signed_url(webhook_url: str, secret: str) -> str:
+    """Add timestamp and HMAC-SHA256 signature to DingTalk webhook URL."""
+    timestamp = str(round(time.time() * 1000))
+    string_to_sign = f"{timestamp}\n{secret}"
+    hmac_code = hmac.new(
+        key=secret.encode("utf-8"),
+        msg=string_to_sign.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).digest()
+    sign = urllib.parse.quote_plus(base64.b64encode(hmac_code).decode("utf-8"))
+    separator = "&" if "?" in webhook_url else "?"
+    return f"{webhook_url}&timestamp={timestamp}&sign={sign}"
+
+
 class DingTalkSender:
-    def __init__(self, webhook_url: str = ""):
+    def __init__(self, webhook_url: str = "", secret: str = ""):
         self.webhook_url = webhook_url or DINGTALK_WEBHOOK_URL
+        self.secret = secret or DINGTALK_SECRET
+
+    def _get_signed_url(self) -> str:
+        if self.secret:
+            return _build_signed_url(self.webhook_url, self.secret)
+        return self.webhook_url
 
     def send_markdown(self, title: str, text: str) -> bool:
-        """Send a single markdown message to DingTalk."""
         if not self.webhook_url:
             logger.warning("DingTalk webhook URL not configured, skipping send.")
             return False
 
+        url = self._get_signed_url()
         payload = {
             "msgtype": "markdown",
             "markdown": {
@@ -31,7 +59,7 @@ class DingTalkSender:
 
         try:
             resp = requests.post(
-                self.webhook_url,
+                url,
                 json=payload,
                 timeout=15,
                 headers={"Content-Type": "application/json"},
@@ -48,18 +76,18 @@ class DingTalkSender:
             return False
 
     def send_text(self, content: str) -> bool:
-        """Send a simple text message."""
         if not self.webhook_url:
             logger.warning("DingTalk webhook URL not configured, skipping send.")
             return False
 
+        url = self._get_signed_url()
         payload = {
             "msgtype": "text",
             "text": {"content": content},
         }
 
         try:
-            resp = requests.post(self.webhook_url, json=payload, timeout=10)
+            resp = requests.post(url, json=payload, timeout=10)
             data = resp.json()
             return data.get("errcode") == 0
         except Exception as e:
@@ -67,10 +95,6 @@ class DingTalkSender:
             return False
 
     def send_report(self, title: str, report: str) -> bool:
-        """
-        Send a report that may exceed DingTalk's character limit.
-        Splits into multiple messages at paragraph boundaries.
-        """
         if not self.webhook_url:
             logger.warning("DingTalk webhook URL not configured, skipping send.")
             return False
@@ -78,7 +102,6 @@ class DingTalkSender:
         if len(report) <= DINGTALK_MAX_MSG_CHARS:
             return self.send_markdown(title, report)
 
-        # Split on section boundaries (## headers)
         sections = []
         current = ""
         for line in report.split("\n"):
@@ -91,7 +114,6 @@ class DingTalkSender:
         if current.strip():
             sections.append(current.strip())
 
-        # Now send each section, combining small adjacent ones
         messages = []
         buffer = ""
         for section in sections:
