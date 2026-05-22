@@ -225,7 +225,6 @@ def run_daily():
         logger.info("Monitoring %s (%s): day %d", name, code, holding_days)
 
         nav_data = fetch_fund_nav(code, name)
-        market_data = market_snapshot.sectors.get(sector)
         current_nav = nav_data.current_nav if nav_data else None
 
         if current_nav is None:
@@ -238,7 +237,7 @@ def run_daily():
             purchase_nav=purchase_nav,
             holding_days=holding_days,
             nav_data=nav_data,
-            market_data=market_data,
+            market_data=None,
             previous_rank_pct=None,
             current_rank_pct=None,
             sector_negative_news=False,
