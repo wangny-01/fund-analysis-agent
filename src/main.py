@@ -341,8 +341,8 @@ def main():
     parser.add_argument(
         "--mode",
         choices=["weekly", "daily", "quick"],
-        required=True,
-        help="weekly: full analysis + recommendations; daily: redemption monitoring; quick: fast redemption check",
+        default="quick",
+        help="weekly: full analysis + recommendations; daily: redemption monitoring; quick: fast redemption check (default)",
     )
     args = parser.parse_args()
 

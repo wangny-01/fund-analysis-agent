@@ -42,7 +42,7 @@ jobs:
         env:
           DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
-        run: python -m src.main --mode ${{ inputs.mode }}
+        run: python -m src.main --mode ${{ github.event_name == 'schedule' && 'daily' || inputs.mode || 'daily' }}
 
       - name: Commit state changes
         if: always()
